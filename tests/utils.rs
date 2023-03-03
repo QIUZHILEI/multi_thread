@@ -55,6 +55,8 @@ fn countdown_test() {
     // test(threads);
 }
 
+//cargo test --test utils -- semaphore_test --nocapture
+
 #[test]
 fn semaphore_test() {
     let arc = Arc::new(Semaphore::new(16));

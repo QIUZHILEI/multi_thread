@@ -1,6 +1,6 @@
 
 pub struct Queue{
-
+    
 }
 
 pub struct Stack{

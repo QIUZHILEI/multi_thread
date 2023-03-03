@@ -64,7 +64,6 @@ impl CountDownLatch {
     }
 }
 
-
 pub struct Semaphore {
     permits: AtomicI64,
     waiters_queue: Queue<Thread>,
@@ -149,66 +148,35 @@ pub struct ReentrantLock {
     waiter_queue: Queue<Thread>,
     lock: AtomicBool,
     hold_lock_thread: AtomicPtr<Thread>,
-    reentrant_num: AtomicI64,
-    is_fair: bool,
+    fair: bool,
 }
 
 impl ReentrantLock {
-    pub fn new(is_fair: bool) -> Self {
+    pub fn new(fair: bool) -> Self {
         Self {
             waiter_queue: Queue::new(),
             lock: AtomicBool::new(false),
             hold_lock_thread: AtomicPtr::new(std::ptr::null_mut()),
-            reentrant_num: AtomicI64::new(0),
-            is_fair,
+            fair,
         }
     }
 
     pub fn lock(&self) {
-        // let mut locked = if self.is_fair {
-        //     self.lock_fair()
-        // } else {
-        //     self.lock_unfair()
-        // };
-        // if !locked {
-        //     let current = thread::current();
-        //     let hold_thread = self.hold_lock_thread.load(Ordering::Relaxed);
-        //     locked = if hold_thread.is_null() {
-        //         if self.is_fair {
-        //             self.lock_fair()
-        //         } else {
-        //             self.lock_unfair()
-        //         }
-        //     } else {
-        //         false
-        //     };
-        //     if !locked {
-        //         //TODO!()->至此，如果线程走向
-        //         let hold_thread_id = unsafe { (*hold_thread).id() };
-        //         if hold_thread_id == current.id() {
-        //             let old_num = self.reentrant_num.fetch_add(1, Ordering::Relaxed);
-        //             if old_num + 1 < 0 {
-        //                 println!("Maximum permit count exceeded!");
-        //                 std::process::abort();
-        //             }
-        //         } else {
-        //             self.waiter_queue.enqueue(current);
-        //             thread::park();
-        //         }
-        //     }
-        // }
-    }
-
-    // fn lock_fair(&self) -> bool {
-    //     if !self.lock.load(Ordering::Acquire) && !self.waiter_queue.has_queued() {
-    //         self.try_lock()
-    //     } else {
-    //         false
-    //     }
-    // }
-
-    fn lock_unfair(&self) -> bool {
-        self.try_lock()
+        let locked = if !self.fair {
+            self.try_lock()
+        } else {
+            if !self.lock.load(Ordering::Acquire) && self.waiter_queue.is_empty() {
+                self.try_lock()
+            } else {
+                false
+            }
+        };
+        if !locked {
+            self.waiter_queue.enqueue(thread::current());
+            thread::park();
+            self.hold_lock_thread
+                .store(&mut thread::current() as *mut Thread, Ordering::Release);
+        }
     }
 
     pub fn try_lock(&self) -> bool {
@@ -219,7 +187,6 @@ impl ReentrantLock {
             Ok(_) => {
                 self.hold_lock_thread
                     .store(&mut thread::current() as *mut Thread, Ordering::Release);
-                self.reentrant_num.store(1, Ordering::Release);
                 true
             }
             Err(_) => false,
@@ -238,15 +205,9 @@ impl ReentrantLock {
             println!("Illegal lock state!");
             std::process::abort();
         }
-
-        let old_num = self.reentrant_num.fetch_sub(1, Ordering::AcqRel);
-        if old_num == 1 {
-            self.hold_lock_thread
-                .store(std::ptr::null_mut(), Ordering::Release);
-            self.lock.store(false, Ordering::Release);
-            if let Some(thread) = self.waiter_queue.dequeue() {
-                thread.unpark();
-            }
+        self.lock.store(false, Ordering::Release);
+        if let Some(thread) = self.waiter_queue.dequeue() {
+            thread.unpark();
         }
     }
 }

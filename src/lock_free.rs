@@ -1,5 +1,5 @@
 use std::alloc::{dealloc, Layout};
-use std::fmt::{Display};
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
@@ -300,7 +300,7 @@ impl<T> Queue<T> {
             if tmp.is_null() {
                 break;
             }
-            count+=1;
+            count += 1;
         }
         count
     }
@@ -353,3 +353,94 @@ impl<T> Drop for Queue<T> {
 
 unsafe impl<T> Send for Queue<T> {}
 unsafe impl<T> Sync for Queue<T> {}
+
+pub struct DoubleLinkedQueue<T> {
+    head: AtomicPtr<DLinkedNode<T>>,
+    tail: AtomicPtr<DLinkedNode<T>>,
+}
+
+struct DLinkedNode<T> {
+    data: Option<T>,
+    prev: *mut DLinkedNode<T>,
+    next: *mut DLinkedNode<T>,
+    _marker: PhantomData<T>,
+}
+
+impl<T> DLinkedNode<T> {
+    fn new(data: T) -> Self {
+        Self {
+            data: Some(data),
+            prev: std::ptr::null_mut(),
+            next: std::ptr::null_mut(),
+            _marker: PhantomData::default(),
+        }
+    }
+}
+
+impl<T> DoubleLinkedQueue<T> {
+    pub fn new() -> Self {
+        let node = Box::into_raw(Box::new(DLinkedNode {
+            data: None,
+            prev: std::ptr::null_mut(),
+            next: std::ptr::null_mut(),
+            _marker: PhantomData::default(),
+        }));
+        Self {
+            head: AtomicPtr::new(node),
+            tail: AtomicPtr::new(node),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let h = self.head.load(Ordering::Relaxed);
+        unsafe { (*h).next.is_null() }
+    }
+
+    pub fn enqueue(&self, data: T) {
+        let node = Box::into_raw(Box::new(DLinkedNode::new(data)));
+        loop {
+            let t = self.tail.load(Ordering::Relaxed);
+            unsafe {
+                (*node).prev = t;
+            }
+            match self
+                .tail
+                .compare_exchange(t, node, Ordering::SeqCst, Ordering::Relaxed)
+            {
+                Ok(pre) => {
+                    unsafe {
+                        (*pre).next = node;
+                    }
+                    break;
+                }
+                Err(_) => unsafe {
+                    (*node).prev = std::ptr::null_mut();
+                },
+            }
+        }
+    }
+
+    pub fn dequeue(&self) -> Option<T> {
+        if self.is_empty() {
+            return None;
+        }
+        loop {
+            let h = self.head.load(Ordering::Relaxed);
+            let first = unsafe { (*h).next };
+            if first.is_null() {
+                return None;
+            } else {
+                match self.head.compare_exchange(h, first, Ordering::SeqCst, Ordering::Relaxed) {
+                    Ok(pre) => {
+                        let data=unsafe{
+                            (*pre).next=std::ptr::null_mut();
+                            (*first).data.take()
+                        };
+                        return data;
+                    },
+                    Err(_) => {},
+                }
+            }
+        }
+    }
+}

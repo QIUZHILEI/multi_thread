@@ -49,14 +49,12 @@ mod queue_test {
                         name: index.to_string() + "stu",
                     })
                 }
-                dequeue(&arc, &mut joins,&counter);
+                dequeue(&arc, &mut joins, &counter);
             }
-            "enqueue" => {
-                enqueue(&arc, &mut joins)
-            },
+            "enqueue" => enqueue(&arc, &mut joins),
             "all" => {
                 enqueue(&arc, &mut joins);
-                dequeue(&arc, &mut joins,&counter);
+                dequeue(&arc, &mut joins, &counter);
             }
             _ => {
                 panic!("Arguments is mistake!");
@@ -72,27 +70,27 @@ mod queue_test {
         let queue = Arc::clone(&arc);
         let remains = queue.size();
         println!("remains: {remains}");
-        println!("counter+remains={}",count+remains);
+        println!("counter+remains={}", count + remains);
     }
 
-    fn sleep(millis:i64) {
+    fn sleep(millis: i64) {
         let mut remains = millis;
-        if remains<0 {
+        if remains < 0 {
             panic!("Sleep duration less than zero!");
         }
         while remains > 0 {
             let dur = Duration::from_micros(remains as u64);
-            let now=std::time::Instant::now();
+            let now = std::time::Instant::now();
             thread::sleep(dur);
             let speed = now.elapsed().as_millis() as i64;
-            remains-=speed;
+            remains -= speed;
         }
     }
 
     fn enqueue(arc: &Arc<Queue<Stu>>, joins: &mut Vec<JoinHandle<()>>) {
         let enqueue_threads = 100;
-        let per_thread_enqueues:u32 = 10000;
-        println!("total:{}",enqueue_threads*(per_thread_enqueues as i32));
+        let per_thread_enqueues: u32 = 10000;
+        println!("total:{}", enqueue_threads * (per_thread_enqueues as i32));
         for i in 0..enqueue_threads {
             let name = "thread-".to_string() + &i.to_string();
             let queue = Arc::clone(&arc);
@@ -101,7 +99,7 @@ mod queue_test {
                 .spawn(move || {
                     for index in 0..per_thread_enqueues {
                         let stu = Stu {
-                            age: (index%255) as u8,
+                            age: (index % 255) as u8,
                             name: name.clone(),
                         };
                         queue.enqueue(stu);
@@ -112,7 +110,7 @@ mod queue_test {
         }
     }
 
-    fn dequeue(arc: &Arc<Queue<Stu>>, joins: &mut Vec<JoinHandle<()>>,counter:&Arc<AtomicU32>){
+    fn dequeue(arc: &Arc<Queue<Stu>>, joins: &mut Vec<JoinHandle<()>>, counter: &Arc<AtomicU32>) {
         let dequeue_threads = 160;
         let per_thread_dequeues = 1000;
         for _ in 0..dequeue_threads {
@@ -132,22 +130,22 @@ mod queue_test {
     //execute: cargo test --test lock_free -- queue_test::single_thread --nocapture
     #[test]
     fn single_thread() {
-        let queue=Queue::new();
-        let enqueue_nums=500;
-        for index in 0..enqueue_nums{
-            let age=(index%255) as u8;
-            queue.enqueue(Stu{
+        let queue = Queue::new();
+        let enqueue_nums = 500;
+        for index in 0..enqueue_nums {
+            let age = (index % 255) as u8;
+            queue.enqueue(Stu {
                 age,
-                name: age.to_string()+"stu"
+                name: age.to_string() + "stu",
             });
         }
-        let remains=queue.size();
+        let remains = queue.size();
         println!("remains: {remains}");
-        let dequeue_nums=400;
-        for _ in 0..dequeue_nums{
+        let dequeue_nums = 400;
+        for _ in 0..dequeue_nums {
             queue.dequeue();
         }
-        let remains=queue.size();
+        let remains = queue.size();
         println!("remains: {remains}");
     }
 }
