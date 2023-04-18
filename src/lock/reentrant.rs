@@ -55,7 +55,11 @@ impl ReentrantLock {
     }
 
     pub(crate) fn try_lock(&self){
-        
+        if self.fair{
+
+        }else{
+            
+        }
     }
 
     pub(crate) fn unlock(&self){

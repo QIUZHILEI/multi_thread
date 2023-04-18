@@ -6,7 +6,6 @@ struct Stu<'a> {
     age: u8,
 }
 
-// test sign git gpg
 fn main() {
     let t1 = thread::spawn(|| {
        // thread::park_timeout(Duration::from_secs(4));
