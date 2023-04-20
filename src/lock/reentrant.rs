@@ -1,5 +1,6 @@
 use std::{sync::atomic::{AtomicPtr, AtomicUsize, Ordering}, cell::Cell};
 
+/// ReentrantLock
 #[derive(Debug,Default)]
 struct IdGenerator{
     gen:AtomicUsize
@@ -65,8 +66,6 @@ impl ReentrantLock {
     pub(crate) fn unlock(&self){
         // unlock
     }
-
-
 }
 
 
