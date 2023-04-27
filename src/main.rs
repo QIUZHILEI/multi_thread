@@ -20,4 +20,6 @@ fn main() {
         t1.join().unwrap();
     });
     t2.join().unwrap();
+
+    use std::any::{Any,TypeId};
 }
